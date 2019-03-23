@@ -112,7 +112,7 @@ ko.bindingHandlers['options'] = {
 
                 // If this option was changed from being selected during a single-item update, notify the change
                 if (itemUpdate && !isSelected) {
-                    ko.bindingEvent.notify(element, ko.bindingEvent.childrenComplete);
+                    ko.dependencyDetection.ignore(ko.utils.triggerEvent, null, [element, "change"]);
                 }
             }
         }
@@ -127,9 +127,11 @@ ko.bindingHandlers['options'] = {
 
         ko.utils.setDomNodeChildrenFromArrayMapping(element, filteredArray, optionForArrayItem, arrayToDomNodeChildrenOptions, callback);
 
-        var selectionChanged = true;
-        if (!valueAllowUnset && !selectWasPreviouslyEmpty) {
+        if (valueAllowUnset || ko.computedContext.isInitial()) {
+            ko.bindingEvent.notify(element, ko.bindingEvent.childrenComplete);
+        } else {
             // Determine if the selection has changed as a result of updating the options list
+            var selectionChanged;
             if (multiple) {
                 // For a multiple-select box, compare the new selection count to the previous one
                 // But if nothing was selected before, the selection can't have changed
@@ -141,10 +143,13 @@ ko.bindingHandlers['options'] = {
                     ? (ko.selectExtensions.readValue(element.options[element.selectedIndex]) !== previousSelectedValues[0])
                     : (previousSelectedValues.length || element.selectedIndex >= 0);
             }
-        }
 
-        if (selectionChanged) {
-            ko.bindingEvent.notify(element, ko.bindingEvent.childrenComplete);
+            // Ensure consistency between model value and selected option.
+            // If the dropdown was changed so that selection is no longer the same,
+            // notify the value or selectedOptions binding.
+            if (selectionChanged) {
+                ko.dependencyDetection.ignore(ko.utils.triggerEvent, null, [element, "change"]);
+            }
         }
 
         // Workaround for IE bug
